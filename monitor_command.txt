@@ -1,0 +1,127 @@
+***系统监控命令
+*查看内存与交换分区信息:free
+[root@rhel ~]# free
+              total        used        free      shared  buff/cache   available
+Mem:       16147372     3542488     7896148       75108     4708736    12230536
+Swap:             0           0           0
+-查看剩余内存容量:free | awk '/Mem/{print $4}'
+[root@rhel ~]# free | awk '/Mem/{print $4}'
+7903864
+-查看交换分区信息:swapon -s
+*查看磁盘信息:df	//df -h
+[root@rhel ~]# df
+文件系统           1K-块      		已用     可用 	已用% 挂载点
+/dev/sda2      123723328  20826260 96589228   18% /
+devtmpfs         8044620         0  8044620    0% /dev
+tmpfs            8073684     48588  8025096    1% /dev/shm
+tmpfs            8073684     17552  8056132    1% /run
+tmpfs            8073684         0  8073684    0% /sys/fs/cgroup
+/dev/sda1      206292968 173657220 22133604   89% /var/lib/libvirt/images
+/dev/loop0       3963760   3963760        0  100% /var/ftp/rhel7
+tmpfs            1614740        44  1614696    1% /run/user/0
+-查看根分区的利用率:df | awk '/\/$/{print $5}'	***
+[root@rhel ~]# df | awk '/\/$/{print $5}'
+18%
+*查看CPU平均负载:uptime
+[root@rhel ~]# uptime	//查看cpu负载(1,5,15分钟)
+ 10:33:39 up 12:43,  4 users,  load average: 0.11, 0.23, 0.15
+-仅查看CPU的15分钟平均负载:uptime | awk '{print $NF}'
+[root@rhel ~]# uptime | awk '{print $NF}'
+0.14
+*查看网卡信息:ifconfig eth0
+[root@rhel ~]# ifconfig eth0
+eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 176.130.7.248  netmask 255.255.255.0  broadcast 176.130.7.255
+        inet6 fe80::7658:fa5f:8dfa:3494  prefixlen 64  scopeid 0x20<link>
+        ether d8:9e:f3:29:41:0c  txqueuelen 1000  (Ethernet)
+        RX packets 805189  bytes 1130790202 (1.0 GiB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 575486  bytes 45124837 (43.0 MiB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+-查看ip地址信息:ifconfig eth0 | awk '/inet /{print $2}'
+[root@rhel ~]# ifconfig eth0 | awk '/inet /{print $2}'
+176.130.7.248
+-网卡接受数据包流量:ifconfig eth0 | awk '/RX p/{print $5}'
+[root@rhel ~]# ifconfig eth0 | awk '/RX p/{print $5}'
+1130820636
+-网卡发送数据包流量:ifconfig eth0 | awk '/TX p/{print $5}'
+[root@rhel ~]# ifconfig eth0 | awk '/TX p/{print $5}'
+45145317
+-查看本机监听的所有端口信息:ss/netstat -antulp
+[root@rhel ~]# ss -ntulp
+Netid  State      Recv-Q Send-Q Local Address:Port         Peer 	Address:Port              
+udp    UNCONN     0      0         *:56462                 *:*             users:(("dhclient",pid=1053,fd=20))
+udp    UNCONN     0      0      201.1.1.254:53             *:*             users:(("dnsmasq",pid=2702,fd=4))
+... ... 
+-显示瞬间行程 (process) 的动态:ps
+[root@rhel ~]# ps
+  PID TTY          TIME CMD
+18572 pts/3    00:00:00 bash
+20076 pts/3    00:00:00 ps
+-显示现行终端机下的所有程序，包括其他用户的程序:ps a 
+[root@rhel ~]# ps a 
+  PID TTY      STAT   TIME COMMAND
+ 1437 tty1     Ssl+   3:26 /usr/bin/X :0 -background none -noreset -audit 4 -ver
+ 3851 pts/0    Ss+    0:00 bash
+ 7042 pts/2    Ss     0:00 bash
+ 7086 pts/2    S+     0:00 ssh 192.168.4.56
+18572 pts/3    Ss     0:00 bash
+20100 pts/3    R+     0:00 ps a
+-显示所有程序:ps -A 
+[root@rhel ~]# ps -A 
+  PID TTY          TIME CMD
+    1 ?        00:00:02 systemd
+    2 ?        00:00:00 kthreadd
+    3 ?        00:00:00 ksoftirqd/0
+    5 ?        00:00:00 kworker/0:0H
+    7 ?        00:00:00 migration/0
+... ...
+-显示所有包含其他使用者的行程:ps -aux 
+[root@rhel ~]# ps -aux 
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.0 191120  4176 ?        Ss   12月17   0:02 /usr/lib/syst
+root         2  0.0  0.0      0     0 ?        S    12月17   0:00 [kthreadd]
+root         3  0.0  0.0      0     0 ?        S    12月17   0:00 [ksoftirqd/0]
+... ...
+-ping网络ip:ping ip地址
+[root@rhel ~]# ping -c 2 192.168.4.56
+PING 192.168.4.56 (192.168.4.56) 56(84) bytes of data.
+64 bytes from 192.168.4.56: icmp_seq=1 ttl=64 time=0.285 ms	//1
+64 bytes from 192.168.4.56: icmp_seq=2 ttl=64 time=0.331 ms	//2
+
+--- 192.168.4.56 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+rtt min/avg/max/mdev = 0.285/0.308/0.331/0.023 ms
+*追踪路由;traceroute
+[root@rhel ~]# traceroute 176.130.7.248
+traceroute to 176.130.7.248 (176.130.7.248), 30 hops max, 60 byte packets
+ 1  adg77-h01-176-130-7-248.dsl.sta.abo.bbox.fr (176.130.7.248)  0.071 ms  0.020 ms  0.018 ms
+注释:traceroute (Windows 系统下是tracert) 命令利用ICMP 协议定位您的计算机和目标计算机之间的所有路由器。TTL 值可以反映数据包经过的路由器或网关的数量，通过操纵独立ICMP 呼叫报文的TTL 值和观察该报文被抛弃的返回信息，traceroute命令能够遍历到数据包传输路径上的所有路由器。
+*输出CPU和磁盘I/O相关的统计信息:iostat
+[root@rhel ~]# iostat
+Linux 3.10.0-327.el7.x86_64 (rhel) 	2018年12月18日 	_x86_64_	(4 CPU)
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           1.85    0.11    0.40    0.40    0.00   97.24
+
+Device:            tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn
+sda               3.06        55.96        40.82    2700890    1970260
+注释:iostat，用于报告中央处理器（CPU）统计信息和整个系统、适配器、tty 设备、磁盘和 CD-ROM 的输入/输出统计信息
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
