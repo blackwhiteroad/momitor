@@ -1,0 +1,376 @@
+一.监控概述
+1.概述
+a.监控的目的
+b.监控的资源类别
+2.监控软件
+a.系统监控命令
+b.自动化监控系统
+
+a.监控的目的
+*报告系统运行状况
+-每一部分必须同时监控
+-内容包括吞吐量,反应时间,使用率等
+*提前发现问题
+-进行服务器性能调整前,知道调整什么
+-找出系统的瓶颈在什么地方
+b.监控的资源类别
+*公开数据
+-web,ftp,ssh,数据库等应用服务
+-tcp或udp端口
+*私有数据
+-cpu,内存,磁盘,网卡流量等使用信息
+-用户,进程等应用信息
+
+a.系统监控命令
+*查看内存与交换分区信息:free
+[root@rhel ~]# free
+              total        used        free      shared  buff/cache   available
+Mem:       16147372     3542488     7896148       75108     4708736    12230536
+Swap:             0           0           0
+-查看剩余内存容量:free | awk '/Mem/{print $4}'
+[root@rhel ~]# free | awk '/Mem/{print $4}'
+7903864
+-查看交换分区信息:swapon -s
+*查看磁盘信息:df	//df -h
+[root@rhel ~]# df
+文件系统           1K-块      		已用     可用 	已用% 挂载点
+/dev/sda2      123723328  20826260 96589228   18% /
+devtmpfs         8044620         0  8044620    0% /dev
+tmpfs            8073684     48588  8025096    1% /dev/shm
+tmpfs            8073684     17552  8056132    1% /run
+tmpfs            8073684         0  8073684    0% /sys/fs/cgroup
+/dev/sda1      206292968 173657220 22133604   89% /var/lib/libvirt/images
+/dev/loop0       3963760   3963760        0  100% /var/ftp/rhel7
+tmpfs            1614740        44  1614696    1% /run/user/0
+-查看根分区的利用率:df | awk '/\/$/{print $5}'	***
+[root@rhel ~]# df | awk '/\/$/{print $5}'
+18%
+*查看CPU平均负载:uptime
+[root@rhel ~]# uptime	//查看cpu负载(1,5,15分钟)
+ 10:33:39 up 12:43,  4 users,  load average: 0.11, 0.23, 0.15
+-仅查看CPU的15分钟平均负载:uptime | awk '{print $NF}'
+[root@rhel ~]# uptime | awk '{print $NF}'
+0.14
+*查看网卡信息:ifconfig eth0
+[root@rhel ~]# ifconfig eth0
+eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 176.130.7.248  netmask 255.255.255.0  broadcast 176.130.7.255
+        inet6 fe80::7658:fa5f:8dfa:3494  prefixlen 64  scopeid 0x20<link>
+        ether d8:9e:f3:29:41:0c  txqueuelen 1000  (Ethernet)
+        RX packets 805189  bytes 1130790202 (1.0 GiB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 575486  bytes 45124837 (43.0 MiB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+-查看ip地址信息:ifconfig eth0 | awk '/inet /{print $2}'
+[root@rhel ~]# ifconfig eth0 | awk '/inet /{print $2}'
+176.130.7.248
+-网卡接受数据包流量:ifconfig eth0 | awk '/RX p/{print $5}'
+[root@rhel ~]# ifconfig eth0 | awk '/RX p/{print $5}'
+1130820636
+-网卡发送数据包流量:ifconfig eth0 | awk '/TX p/{print $5}'
+[root@rhel ~]# ifconfig eth0 | awk '/TX p/{print $5}'
+45145317
+-查看本机监听的所有端口信息:ss/netstat -antulp
+[root@rhel ~]# ss -ntulp
+Netid  State      Recv-Q Send-Q Local Address:Port         Peer 	Address:Port              
+udp    UNCONN     0      0         *:56462                 *:*             users:(("dhclient",pid=1053,fd=20))
+udp    UNCONN     0      0      201.1.1.254:53             *:*             users:(("dnsmasq",pid=2702,fd=4))
+... ... 
+-显示瞬间行程 (process) 的动态:ps
+[root@rhel ~]# ps
+  PID TTY          TIME CMD
+18572 pts/3    00:00:00 bash
+20076 pts/3    00:00:00 ps
+-显示现行终端机下的所有程序，包括其他用户的程序:ps a 
+[root@rhel ~]# ps a 
+  PID TTY      STAT   TIME COMMAND
+ 1437 tty1     Ssl+   3:26 /usr/bin/X :0 -background none -noreset -audit 4 -ver
+ 3851 pts/0    Ss+    0:00 bash
+ 7042 pts/2    Ss     0:00 bash
+ 7086 pts/2    S+     0:00 ssh 192.168.4.56
+18572 pts/3    Ss     0:00 bash
+20100 pts/3    R+     0:00 ps a
+-显示所有程序:ps -A 
+[root@rhel ~]# ps -A 
+  PID TTY          TIME CMD
+    1 ?        00:00:02 systemd
+    2 ?        00:00:00 kthreadd
+    3 ?        00:00:00 ksoftirqd/0
+    5 ?        00:00:00 kworker/0:0H
+    7 ?        00:00:00 migration/0
+... ...
+-显示所有包含其他使用者的行程:ps -aux 
+[root@rhel ~]# ps -aux 
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.0 191120  4176 ?        Ss   12月17   0:02 /usr/lib/syst
+root         2  0.0  0.0      0     0 ?        S    12月17   0:00 [kthreadd]
+root         3  0.0  0.0      0     0 ?        S    12月17   0:00 [ksoftirqd/0]
+... ...
+-ping网络ip:ping ip地址
+[root@rhel ~]# ping -c 2 192.168.4.56
+PING 192.168.4.56 (192.168.4.56) 56(84) bytes of data.
+64 bytes from 192.168.4.56: icmp_seq=1 ttl=64 time=0.285 ms	//1
+64 bytes from 192.168.4.56: icmp_seq=2 ttl=64 time=0.331 ms	//2
+
+--- 192.168.4.56 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+rtt min/avg/max/mdev = 0.285/0.308/0.331/0.023 ms
+*追踪路由;traceroute
+[root@rhel ~]# traceroute 176.130.7.248
+traceroute to 176.130.7.248 (176.130.7.248), 30 hops max, 60 byte packets
+ 1  adg77-h01-176-130-7-248.dsl.sta.abo.bbox.fr (176.130.7.248)  0.071 ms  0.020 ms  0.018 ms
+注释:traceroute (Windows 系统下是tracert) 命令利用ICMP 协议定位您的计算机和目标计算机之间的所有路由器。TTL 值可以反映数据包经过的路由器或网关的数量，通过操纵独立ICMP 呼叫报文的TTL 值和观察该报文被抛弃的返回信息，traceroute命令能够遍历到数据包传输路径上的所有路由器。
+*输出CPU和磁盘I/O相关的统计信息:iostat
+[root@rhel ~]# iostat
+Linux 3.10.0-327.el7.x86_64 (rhel) 	2018年12月18日 	_x86_64_	(4 CPU)
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           1.85    0.11    0.40    0.40    0.00   97.24
+
+Device:            tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn
+sda               3.06        55.96        40.82    2700890    1970260
+注释:iostat，用于报告中央处理器（CPU）统计信息和整个系统、适配器、tty 设备、磁盘和 CD-ROM 的输入/输出统计信息
+b.自动化监控系统
+*Zabbix:基于多种监控机制,支持分布式监控
+-Cacit:基于SNMP协议的监控软件,强大的绘图能力
+-Nagios:基于Agent监控,强大的状态检查与报警机制,插件极多,自己写监控脚本潜入到Nagios十分方便
+
+
+
+
+
+
+
+***创建3台zabbix监控平台,涉及主机名,IP地址,网卡信息,yum源
+*主机名
+]# hostnamectl set-hostname zabbixclient_web1
+*网卡信息
+#IP地址,先添加网卡
+]# nmcli connection add con-name eth1 ifname eth1 type ethernet
+]# nmcli connection modify eth1 ipv4.method manual ipv4.addresses 192.168.4.86/24 connection.autoconnect yes
+]# nmcli connection up eth1
+//systemctl restart NetworkManager
+//cat /etc/sysconfig/network-scripts/ifcfg-eth1
+*yum源
+]# vim /etc/yum.repos.d/zabbixclient_web1_86.repo
+[zabbixclient_web1_86]
+name=redhat
+baseurl=ftp://192.168.4.254/rhel7
+gpgcheck=0
+]# yum repolist
+*关闭防火墙
+]# systemctl stop firewalld
+*临时关闭selinux
+]# setenforce 0
+
+***部署监控服务器
+**安装LNMP环境(zabbixserver_76)
+[root@rhel MySQL_RPM]# scp nginx-1.12.2.tar.gz 192.168.4.76:/root/
+[root@zabbixserver ~]# yum -y install gcc pcre-devel openssl-devel
+[root@zabbixserver ~]# tar -xf nginx-1.12.2.tar.gz 
+[root@zabbixserver ~]# cd nginx-1.12.2/
+[root@zabbixserver nginx-1.12.2]# ./configure --with-http_ssl_module
+[root@zabbixserver nginx-1.12.2]# make && make install
+[root@rhel MySQL_RPM]# scp php-fpm-5.4.16-42.el7.x86_64.rpm 192.168.4.76:/root/
+[root@zabbixserver ~]# yum -y install php-fpm-5.4.16-42.el7.x86_64.rpm
+[root@zabbixserver ~]# vim /usr/local/nginx/conf/nginx.conf
+... ...
+http{
+... ...
+	  fastcgi_buffers 8 16k;	//缓存php生成的页面内容,8个16k
+        fastcgi_buffer_size 32k;	//缓存php生成的头部信息
+        fastcgi_connect_timeout 300;//连接php的超时时间
+        fastcgi_send_timeout 300;	//发送请求的超时时间
+        fastcgi_read_timeout 300;	//读取请求的超时时间
+        location ~ \.php$ {
+            root           html;
+            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_index  index.php;
+        #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+        #    include        fastcgi_params;
+            include        fastcgi.conf;
+        }
+... ...
+**启动nginx,php-fpm,mariadb服务;关闭防火墙,linux
+[root@zabbixserver ~]# ln -s /usr/local/nginx/sbin/nginx /sbin/nginx
+[root@zabbixserver ~]# nginx
+[root@zabbixserver ~]# systemctl start php-fpm
+[root@zabbixserver ~]# yum -y install php php-mysql mariadb mariadb-devel mariadb-server
+[root@zabbixserver ~]# systemctl start mariadb
+[root@zabbixserver ~]# firewall-cmd --set-default-zone=trusted
+success
+[root@zabbixserver ~]# setenforce 0
+
+**测试LNMP环境
+服务器创建PHP测试页面,浏览器访问测试网页的连通性
+[root@zabbixserver ~]# vim /usr/local/nginx/html/test.php
+<?php
+$i=33;
+echo $i;
+?>
+[root@zabbixserver ~]# curl http://192.168.4.76/test.php
+33
+
+**部署监控服务器Zabbix Server
+#首先安装相关依赖包
+[root@zabbixserver ~]# yum -y install net-snmp-devel curl-devel
+[root@rhel lnmp_soft]# scp libevent-devel-2.0.21-4.el7.x86_64.rpm 192.168.4.76:/root/
+[root@zabbixserver ~]# yum -y install ibevent-devel-2.0.21-4.el7.x86_64.rpm
+#源码安装Zabbix Server
+[root@zabbixserver ~]# tar -xf zabbix-3.4.4.tar.gz 
+[root@zabbixserver ~]# cd zabbix-3.4.4/
+[root@zabbixserver zabbix-3.4.4]# ./configure \
+> --enable-server \	//安装部署zabbix服务器端软件
+> --enable-proxy \	//安装部署zabbix被监控端软件
+> --enable-agent \	//安装部署zabbix代理相关软件
+> --with-mysql=/usr/bin/mysql_config \	//配置mysql_config路径
+> --with-net-snmp \	//允许zabbix通过snmp协议监控其它设备
+> --with-libcurl		//安装相关curl库文件,这样zabbix就可以通过curl连接http等服务,测试被监控事务
+[root@zabbixserver zabbix-3.4.4]# make && make install
+#初始化Zabbix,创建数据库,上线Zabbix的Web页面
+[root@zabbixserver ~]# mysql
+-创建数据库,支持中文字符集
+MariaDB [(none)]> create database zabbix character set utf8;
+-创建可以访问数据库的账户和密码
+MariaDB [(none)]> grant all on zabbix.* to zabbix@'localhost' identified by 'zabbix';
+-使用mysql导入zabbix源码数据
+[root@zabbixserver ~]# cd zabbix-3.4.4/database/mysql/
+[root@zabbixserver mysql]# ls
+data.sql  images.sql  schema.sql
+[root@zabbixserver mysql]# mysql -uzabbix -pzabbix zabbix < schema.sql
+[root@zabbixserver mysql]# mysql -uzabbix -pzabbix zabbix < images.sql
+[root@zabbixserver mysql]# mysql -uzabbix -pzabbix zabbix < data.sql
+-上线Zabbix的Web页面
+[root@zabbixserver zabbix-3.4.4]# cd
+[root@zabbixserver ~]# cd zabbix-3.4.4/frontends/php/
+[root@zabbixserver php]# cp -r * /usr/local/nginx/html/
+[root@zabbixserver php]# chmod -R 777 /usr/local/nginx/html/*
+**修改Zabbix_server配置文件,设置数据库相关参数,启动Zabbix_server服务
+[root@zabbixserver php]# vim /usr/local/etc/zabbix_server.conf
+ 86 #数据库主机,默认该行被注释
+ 87 DBHost=localhost
+ 97 #设置数据库名称
+ 98 DBName=zabbix
+113 #设置数据库账户
+114 DBUser=zabbix
+123 #设置数据库密码,默认该行被注释
+124 DBPassword=zabbix
+ 37 #设置日志
+ 38 LogFile=/tmp/zabbis_server.log
+-创建用户启动,安全可靠
+[root@zabbixserver php]# useradd -s /sbin/nologin zabbix
+-启动服务
+[root@zabbixserver php]# zabbix_server 
+-确认连接状态,端口10051
+[root@zabbixserver php]# ss -ntulp | grep zabbix.server
+tcp    LISTEN     0      128       *:10051                 *:*                   users:(("zabbix_server",pid=20771,fd=4),("zabbix_server",pid=20770,fd=4),... ...
+注释:如果时因为配置文件不对,导致服务无法启动时,不要重复执行zabbix_server,
+一定要先使用killall zabbix_server关闭服务后,再重新启动一次.
+修改Zabbix_agent配置文件,启动Zabbix_agent服务
+
+[root@zabbixserver php]# vim /usr/local/etc/zabbix_agentd.conf
+ 93 Server=127.0.0.1,192.168.4.76		//允许哪些主机监控本机
+134 ServerActive=127.0.0.1,192.168.4.76	//允许哪些主机通过主动模式监控本机
+145 #Hostname=Zabbix server			
+146 Hostname=Zabbix_server			//设置本机主机名
+ 30 #LogFile=/tmp/zabbix_agentd.log
+ 31 LogFile=/tmp/zabbix_server.log		//设置日志文件
+282 # UnsafeUserParameters=0
+283 UnsafeUserParameters=1			//是否允许自定义key
+-启动监控agent
+[root@zabbixserver php]# zabbix_agentd 
+-查看端口信息为10050
+[root@zabbixserver php]# ss -ntulp | grep zabbix.agentd
+tcp    LISTEN     0      128       *:10050                 *:*                   users:(("zabbix_agentd",pid=20989,fd=4),... ...
+注释:如果时因为配置文件不对,导致服务无法启动时,不要重复执行zabbix_agentd,
+一定要先使用killall zabbix_agentd关闭服务后,再重新启动一次.
+浏览器访问Zabbix_server服务器的Web页面
+[root@zabbixserver php]# firefox http://192.168.4.76/index.php
+//第一次访问,初始化PHP页面会检查计算机环境是否满足要求,如果不满足会给出修改建议
+//默认会提示PHP的设置不满足环境要求,需要修改PHP配置文件
+[root@zabbixserver php]# yum -y install php-gd php-xml
+[root@zabbixserver ~]# yum -y install php-bcmath-5.4.16-42.el7.x86_64.rpm 
+[root@zabbixserver ~]# yum -y install php-mbstring-5.4.16-42.el7.x86_64.rpm 
+[root@zabbixserver ~]# vim /etc/php.ini
+ 880 ;date.timezone 
+ 881 date.timezone = Asia/Shanghai	//设置时区
+ 384 #max_execution_time = 30
+ 385 max_execution_time = 300	//最大执行时间,s
+ 673 #post_max_size = 8M
+ 674 post_max_size = 32M	//POST数据最大容量
+ 395 #max_input_time = 60
+ 396 max_input_time = 300	//服务器接收数据的时间限制
+ 407 memory_limit = 128M	//内存容量限制
+[root@zabbixserver ~]# systemctl restart php-fpm
+
+***部署被监控主机(zabbix_client_86,zabbix_client_96)
+*源码安装Zabbix agent软件
+[root@zabbixclient_web1 ~]# useradd -s /sbin/nologin zabbix
+[root@zabbixclient_web1 ~]# yum -y install gcc pcre-devel
+[root@rhel lnmp_soft]# scp zabbix-3.4.4.tar.gz 192.168.4.86:/root/
+[root@zabbixclient_web1 zabbix-3.4.4]# tar -xf zabbix-3.4.4.tar.gz 
+[root@zabbixclient_web1 zabbix-3.4.4]# cd zabbix-3.4.4/
+[root@zabbixclient_web1 zabbix-3.4.4]# ./configure --enable-agent
+[root@zabbixclient_web1 zabbix-3.4.4]# make && make install
+[root@zabbixclient_web1 php]# vim /usr/local/etc/zabbix_agentd.conf
+ 93 Server=127.0.0.1,192.168.4.76		//允许哪些主机监控本机
+134 ServerActive=127.0.0.1,192.168.4.76	//允许哪些主机通过主动模式监控本机
+145 Hostname=zabbixclient_web1		//设置本机主机名
+ 69 EnableRemoteCommands=1			//监控异常后,是否允许服务器远程过来执行命令,如重启某个服务
+282 UnsafeUserParameters=1			//是否允许自定义key
+-启动agent服务
+[root@zabbixclient_web1 zabbix-3.4.4]# zabbix_agentd 
+-拷贝启动脚本(非必须操作),有启动脚本可以方便管理服务,启动与关闭服务,启动脚本位于源Zabbix
+源码目录下a
+[root@zabbixclient_web1 zabbix-3.4.4]# cd misc/init.d/fedora/core
+[root@zabbixclient_web1 core]# cp zabbix_agentd /etc/init.d/
+[root@zabbixclient_web1 core]# /etc/init.d/zabbix_agentd start
+Reloading systemd:                                         [  确定  ]
+Starting zabbix_agentd (via systemctl):                    [  确定  ]
+[root@zabbixclient_web1 core]# /etc/init.d/zabbix_agentd stop
+Stopping zabbix_agentd (via systemctl):                    [  确定  ]
+[root@zabbixclient_web1 core]# /etc/init.d/zabbix_agentd status
+[root@zabbixclient_web1 core]# /etc/init.d/zabbix_agentd restart
+
+***被监控主机创建自定义key(zabbixclient_web1)
+*创建自定义key
+语法格式为:UserParameter=自定义key名称,命令
+自定义的key文件一般存储在/usr/local/etc/zabbix_agentd.conf.d/目录,这里还需要修改
+zabbix_agentd.conf.d文件,允许自定义监控Key,来读取该目录下的所有文件
+[root@zabbixclient_web1 core]# vim /usr/local/etc/zabbix_agentd.conf 
+261 # Include=
+262 Include=/usr/local/etc/zabbix_agentd.conf.d/	//加载自定义key配置文件目录
+[root@zabbixclient_web1 core]# cd /usr/local/etc/zabbix_agentd.conf.d/
+[root@zabbixclient_web1 zabbix_agentd.conf.d]# vim count.line.passwd
+UserParameter=count.line.passwd,wc -l /etc/passwd | awk '{print $1}'
+*测试自定义key是否正常工作
+[root@zabbixclient_web1 zabbix_agentd.conf.d]# killall zabbix_agentd 
+[root@zabbixclient_web1 zabbix_agentd.conf.d]# zabbix_agentd 
+[root@zabbixclient_web1 zabbix_agentd.conf.d]# zabbix_get -s 127.0.0.1 -k count.line.passwd 
+41
+**如若zabbix的ZBX无法连接,则执行命令:
+[root@zabbixclient_web3 zabbix_agentd.conf.d]# systemctl start firewalld.service 
+[root@zabbixclient_web3 zabbix_agentd.conf.d]# firewall-cmd --set-default-zone=trusted
+success
+[root@zabbixclient_web2 zabbix_agentd.conf.d]# firewall-cmd --add-port=10050/tcp
+success
+
+SMTP服务器:mail.company.com
+SMTP电邮:zabbix@company.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
